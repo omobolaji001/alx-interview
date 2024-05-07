@@ -1,8 +1,9 @@
 #!/usr/bin/python3
 
-""" A script to determines if a given data 
+""" A script to determines if a given data
     set represents a valid UTF-8 encoding.
 """
+
 
 def validUTF8(data):
     """Return True if data is a valid UTF-8 encoding, else return False.
@@ -10,19 +11,37 @@ def validUTF8(data):
     Args:
         data (List[int]): list of integers representing bytes in the data set.
     """
-    count = 0
+    mask_1 = 1 << 7
+    mask_2 = 1 << 6
+    continuation_byte = 0
+
     for byte in data:
-        if count == 0:
-            if (byte >> 5) == 0b110:
-                count = 1
-            elif (byte >> 4) == 0b1110:
-                count = 2
-            elif (byte >> 3) == 0b11110:
-                count = 3
-            elif (byte >> 7):
+        mask = 1 << 7
+        # In case we are not expecting a continuation byte
+        if continuation_byte == 0:
+            # check the number of 1's we have in the MSB
+            # This determines how many continuation bytes
+            # we are to expect
+            while byte & mask:
+                continuation_byte += 1
+                mask = mask >> 1
+
+            # If the byte is a 1-byte, then we contiue the loop
+            if continuation_byte == 0:
+                continue
+            # If the continuation byte is 1 or 4, then it has violated
+            # the UTF8 rule
+            if continuation_byte == 1 or continuation_byte > 4:
                 return False
         else:
-            if (byte >> 6) != 0b10:
+            # In the case where continuation_byte is present
+            # we check if it fulfills the rule of UTF8 that says
+            # it must be continued with the MSB being `10`
+            if not (byte & mask_1 and not (byte & mask_2)):
                 return False
-            count -= 1
-    return count == 0
+
+        # After making sure the rule is fulfilled
+        # we decrement the continuation byte
+        continuation_byte -= 1
+
+    return continuation_byte == 0
